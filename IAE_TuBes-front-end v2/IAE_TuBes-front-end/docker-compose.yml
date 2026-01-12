@@ -1,0 +1,193 @@
+version: '3.8'
+services:
+  graphql-gateway:
+    build: ./graphql-gateway
+    ports:
+    - 4000:4000
+    networks:
+    - travel-network
+    depends_on:
+      membership-service:
+        condition: service_started
+      hotel-service:
+        condition: service_started
+      booking-service:
+        condition: service_started
+      payment-service:
+        condition: service_started
+      promo-service:
+        condition: service_started
+    restart: unless-stopped
+  membership-service:
+    build: ./membership-service
+    ports:
+    - 4001:4000
+    environment:
+    - DB_HOST=membership-db
+    - DB_NAME=membership_db
+    - DB_USER=user
+    - DB_PASS=pass
+    networks:
+    - travel-network
+    depends_on:
+      membership-db:
+        condition: service_healthy
+    restart: unless-stopped
+  membership-db:
+    image: postgres:15-alpine
+    environment:
+    - POSTGRES_USER=user
+    - POSTGRES_PASSWORD=pass
+    - POSTGRES_DB=membership_db
+    networks:
+    - travel-network
+    volumes:
+    - membership_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U user -d membership_db
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+  hotel-service:
+    build: ./hotel-service
+    ports:
+    - 4002:4000
+    environment:
+    - MONGO_URI=mongodb://hotel-db:27017/hotel_db
+    networks:
+    - travel-network
+    depends_on:
+      hotel-db:
+        condition: service_healthy
+    restart: unless-stopped
+  hotel-db:
+    image: mongo:6
+    networks:
+    - travel-network
+    volumes:
+    - hotel_data:/data/db
+    healthcheck:
+      test:
+      - CMD
+      - mongosh
+      - --quiet
+      - --eval
+      - 'db.runCommand({ ping: 1 }).ok'
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+  booking-service:
+    build: ./booking-service
+    ports:
+    - 4003:4000
+    environment:
+    - DB_HOST=booking-db
+    - DB_NAME=booking_db
+    - DB_USER=user
+    - DB_PASS=pass
+    - AIRLINE_FLIGHT_SCHEDULE_SERVICE=${AIRLINE_FLIGHT_SCHEDULE_SERVICE:-http://host.docker.internal:4002}
+    - AIRLINE_FLIGHT_BOOKING_SERVICE=${AIRLINE_FLIGHT_BOOKING_SERVICE:-http://host.docker.internal:4003}
+    - PARTNER_API_KEY=${PARTNER_API_KEY:-PARTNER_SECRET}
+    networks:
+    - travel-network
+    depends_on:
+      booking-db:
+        condition: service_healthy
+    restart: unless-stopped
+  booking-db:
+    image: postgres:15-alpine
+    environment:
+    - POSTGRES_USER=user
+    - POSTGRES_PASSWORD=pass
+    - POSTGRES_DB=booking_db
+    networks:
+    - travel-network
+    volumes:
+    - booking_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U user -d booking_db
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+  payment-service:
+    build: ./payment-service
+    ports:
+    - 4004:4000
+    environment:
+    - DB_HOST=payment-db
+    - DB_NAME=payment_db
+    - DB_USER=user
+    - DB_PASS=pass
+    networks:
+    - travel-network
+    depends_on:
+      payment-db:
+        condition: service_healthy
+    restart: unless-stopped
+  payment-db:
+    image: postgres:15-alpine
+    environment:
+    - POSTGRES_USER=user
+    - POSTGRES_PASSWORD=pass
+    - POSTGRES_DB=payment_db
+    networks:
+    - travel-network
+    volumes:
+    - payment_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U user -d payment_db
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+  promo-service:
+    build: ./promo-service
+    ports:
+    - 4005:4000
+    environment:
+    - DB_HOST=promo-db
+    - DB_NAME=promo_db
+    - DB_USER=user
+    - DB_PASS=pass
+    networks:
+    - travel-network
+    depends_on:
+      promo-db:
+        condition: service_healthy
+    restart: unless-stopped
+  promo-db:
+    image: postgres:15-alpine
+    environment:
+    - POSTGRES_USER=user
+    - POSTGRES_PASSWORD=pass
+    - POSTGRES_DB=promo_db
+    networks:
+    - travel-network
+    volumes:
+    - promo_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U user -d promo_db
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+networks:
+  travel-network:
+    driver: bridge
+volumes:
+  membership_data: null
+  hotel_data: null
+  booking_data: null
+  payment_data: null
+  promo_data: null
